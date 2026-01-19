@@ -1,0 +1,16 @@
+ArchDek Source Available License (Non-Commercial)
+
+The source code of ArchDek is made available for viewing,
+study, and non-commercial use.
+
+You may:
+- Fork the repository for personal or academic use
+- Submit pull requests
+- Modify the code for non-commercial purposes
+
+You may NOT:
+- Use the code in commercial products
+- Resell or repackage the application
+- Use the code in competing platforms without permission
+
+For commercial licensing, contact the project maintainer.
