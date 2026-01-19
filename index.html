@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArchDek - Architectural Echoes of Brutalism</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2E2E2E">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body, html { margin:0; padding:0; height:100%; background:#121212; color:#EEE; font-family:sans-serif; }
+    #map { height: 100vh; width: 100%; }
+    #sidebar { position: absolute; top: 10px; left: 10px; background: #1e1e1ecc; padding: 10px; border-radius: 8px; z-index: 1000; max-width: 300px; }
+    select, button { width: 100%; margin-top: 5px; }
+    .building-card { background:#2e2e2e; padding:8px; margin:5px 0; border-radius:5px; cursor:pointer; }
+    .building-card.visited { background: #444; text-decoration: line-through; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h3>ArchDek - Brutalism</h3>
+    <label for="countryFilter">Filter by Country:</label>
+    <select id="countryFilter">
+      <option value="all">All</option>
+    </select>
+    <button id="locateBtn">Find Brutalism Near Me</button>
+    <h4>Buildings</h4>
+    <div id="buildingList"></div>
+  </div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+  <script>
+    const map = L.map('map').setView([20,0], 2);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+
+    let buildings = [];
+    let markers = [];
+    let heatLayer;
+
+    // Load JSON
+    fetch('data/brutalism.json')
+      .then(res => res.json())
+      .then(data => {
+        buildings = data;
+        populateCountryFilter();
+        renderBuildings();
+        renderHeatmap();
+      });
+
+    function populateCountryFilter() {
+      const countries = [...new Set(buildings.map(b => b.country))].sort();
+      const select = document.getElementById('countryFilter');
+      countries.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        select.appendChild(opt);
+      });
+      select.addEventListener('change', renderBuildings);
+    }
+
+    function renderBuildings() {
+      const list = document.getElementById('buildingList');
+      list.innerHTML = '';
+      const country = document.getElementById('countryFilter').value;
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+      buildings.filter(b => country==='all'||b.country===country)
+        .forEach(b => {
+          const div = document.createElement('div');
+          div.className = 'building-card';
+          if (b.visited) div.classList.add('visited');
+          div.textContent = b.name + " (" + b.city + ")";
+          div.addEventListener('click', () => showOnMap(b));
+          list.appendChild(div);
+
+          const marker = L.marker([b.lat,b.lng]).addTo(map)
+            .bindPopup(`<b>${b.name}</b><br>${b.city}, ${b.country}<br>Architect: ${b.architect}<br>Year: ${b.year}<br>Status: ${b.status}`);
+          markers.push(marker);
+        });
+    }
+
+    function renderHeatmap() {
+      const points = buildings.map(b => [b.lat,b.lng,1]);
+      if (heatLayer) map.removeLayer(heatLayer);
+      heatLayer = L.heatLayer(points, {radius:25, blur:15, maxZoom:17}).addTo(map);
+    }
+
+    function showOnMap(b) {
+      map.setView([b.lat,b.lng],16);
+      markers.find(m => m.getLatLng().lat===b.lat && m.getLatLng().lng===b.lng)?.openPopup();
+    }
+
+    document.getElementById('locateBtn').addEventListener('click', () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const nearby = buildings.map(b => ({...b, dist: distance(lat,lng,b.lat,b.lng)}))
+                                  .sort((a,b)=>a.dist-b.dist)
+                                  .slice(0,10);
+          if (nearby.length>0) showOnMap(nearby[0]);
+        });
+      } else alert('Geolocation not supported.');
+    });
+
+    function distance(lat1,lng1,lat2,lng2){
+      const R = 6371;
+      const dLat = (lat2-lat1)*Math.PI/180;
+      const dLng = (lng2-lng1)*Math.PI/180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+      const c = 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+      return R*c;
+    }
+
+    // Local storage for visited / favorites
+    function toggleVisited(id) {
+      const b = buildings.find(b=>b.id===id);
+      b.visited = !b.visited;
+      localStorage.setItem('visited', JSON.stringify(buildings.filter(b=>b.visited).map(b=>b.id)));
+      renderBuildings();
+    }
+
+    function loadVisited() {
+      const visited = JSON.parse(localStorage.getItem('visited')||'[]');
+      buildings.forEach(b=>b.visited=visited.includes(b.id));
+    }
+
+    loadVisited();
+  </script>
+</body>
+</html>
