@@ -5,168 +5,216 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ArchDek — Architectural Echoes of Brutalism</title>
 
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#111111" />
-
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
     :root {
-      --bg: #0f0f0f;
-      --fg: #e5e5e5;
-      --accent: #9c9c9c;
-      --panel: #1a1a1a;
+      --bg: #0e0e0e;
+      --panel: #161616;
+      --text: #e6e6e6;
+      --muted: #9a9a9a;
+      --accent: #cfcfcf;
     }
-
-    * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: system-ui, sans-serif;
       background: var(--bg);
-      color: var(--fg);
+      color: var(--text);
     }
 
-    a { color: inherit; text-decoration: none; }
-
-    /* WELCOME SCREEN */
-    #welcome {
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(160deg, #0f0f0f, #1c1c1c);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 10;
-      transition: opacity 0.8s ease;
+    #app {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      height: 100vh;
     }
 
-    #welcome.hidden {
-      opacity: 0;
-      pointer-events: none;
+    aside {
+      background: var(--panel);
+      padding: 16px;
+      overflow-y: auto;
+      border-right: 1px solid #222;
     }
 
-    #welcome h1 {
-      font-size: 3rem;
-      letter-spacing: 0.2rem;
-      margin-bottom: 1rem;
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 12px;
     }
 
-    #welcome p {
-      max-width: 500px;
-      text-align: center;
-      opacity: 0.8;
+    .filter {
+      margin-bottom: 12px;
     }
 
-    #enter-btn {
-      margin-top: 2rem;
-      padding: 1rem 2.5rem;
-      background: none;
-      border: 1px solid var(--accent);
-      color: var(--fg);
-      font-size: 1rem;
+    select, input {
+      width: 100%;
+      padding: 6px;
+      background: #111;
+      color: var(--text);
+      border: 1px solid #333;
+    }
+
+    #results {
+      margin-top: 16px;
+    }
+
+    .place {
       cursor: pointer;
-      transition: background 0.3s;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #222;
     }
 
-    #enter-btn:hover {
-      background: var(--panel);
-    }
-
-    /* MAP PAGE */
-    header {
-      padding: 1rem;
-      background: var(--panel);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    #map {
-      height: calc(100vh - 60px);
-    }
-
-    /* BUILDING CARD */
-    .popup-card {
-      width: 220px;
-    }
-
-    .popup-card img {
+    .place img {
       width: 100%;
       height: 120px;
       object-fit: cover;
-      margin-bottom: 0.5rem;
+      margin-bottom: 6px;
+      filter: grayscale(100%);
     }
 
-    .popup-card h3 {
-      margin: 0.2rem 0;
-      font-size: 1rem;
+    #map {
+      height: 100vh;
     }
 
-    .popup-card p {
-      font-size: 0.8rem;
-      opacity: 0.8;
+    @media (max-width: 900px) {
+      #app {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        height: 50vh;
+        border-right: none;
+        border-bottom: 1px solid #222;
+      }
+
+      #map {
+        height: 50vh;
+      }
     }
   </style>
 </head>
 <body>
 
-  <!-- WELCOME -->
-  <section id="welcome">
-    <h1>ARCHDEK</h1>
-    <p>Architectural Echoes of Brutalism. Explore, collect and map architectural movements around the world.</p>
-    <button id="enter-btn">ENTER THE MAP</button>
-  </section>
+<div id="app">
+  <aside>
+    <h1>ArchDek</h1>
 
-  <!-- APP -->
-  <header>
-    <strong>ArchDek</strong>
-    <span id="status">Explore the map</span>
-  </header>
+    <input id="search" placeholder="Search by name" />
+
+    <div class="filter">
+      <select id="filter-style"><option value="">All styles</option></select>
+    </div>
+
+    <div class="filter">
+      <select id="filter-tag"><option value="">All tags</option></select>
+    </div>
+
+    <div class="filter">
+      <select id="filter-status"><option value="">All status</option></select>
+    </div>
+
+    <div class="filter">
+      <select id="filter-country"><option value="">All countries</option></select>
+    </div>
+
+    <div id="results"></div>
+  </aside>
 
   <div id="map"></div>
+</div>
 
-  <!-- Leaflet -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let map = L.map('map').setView([20, 0], 2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap'
+}).addTo(map);
 
-  <script>
-    // Welcome screen
-    document.getElementById('enter-btn').addEventListener('click', () => {
-      document.getElementById('welcome').classList.add('hidden');
-    });
+let markers = [];
+let places = [];
 
-    // Map
-    const map = L.map('map').setView([20, 0], 2);
+fetch('data/brutalism.json')
+  .then(r => r.json())
+  .then(data => {
+    places = data;
+    initFilters(data);
+    render(data);
+  });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
+function initFilters(data) {
+  fillSelect('filter-style', [...new Set(data.flatMap(p => p.styles))]);
+  fillSelect('filter-tag', [...new Set(data.flatMap(p => p.tags))]);
+  fillSelect('filter-status', [...new Set(data.map(p => p.status))]);
+  fillSelect('filter-country', [...new Set(data.map(p => p.country))]);
+}
 
-    // Load data
-    fetch('data/brutalism.json')
-      .then(r => r.json())
-      .then(data => {
-        data.forEach(place => {
-          const marker = L.marker([place.lat, place.lng]).addTo(map);
+function fillSelect(id, values) {
+  const select = document.getElementById(id);
+  values.sort().forEach(v => {
+    const o = document.createElement('option');
+    o.value = v;
+    o.textContent = v;
+    select.appendChild(o);
+  });
+}
 
-          marker.bindPopup(`
-            <div class="popup-card">
-              <img src="${place.image}" alt="${place.name}" />
-              <h3>${place.name}</h3>
-              <p>${place.city}, ${place.country}</p>
-            </div>
-          `);
-        });
-      });
+['search','filter-style','filter-tag','filter-status','filter-country']
+  .forEach(id => document.getElementById(id).addEventListener('input', applyFilters));
 
-    // Service Worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js');
-    }
-  </script>
+function applyFilters() {
+  const s = document.getElementById('search').value.toLowerCase();
+  const style = document.getElementById('filter-style').value;
+  const tag = document.getElementById('filter-tag').value;
+  const status = document.getElementById('filter-status').value;
+  const country = document.getElementById('filter-country').value;
+
+  const filtered = places.filter(p =>
+    (!s || p.name.toLowerCase().includes(s)) &&
+    (!style || p.styles.includes(style)) &&
+    (!tag || p.tags.includes(tag)) &&
+    (!status || p.status === status) &&
+    (!country || p.country === country)
+  );
+
+  render(filtered);
+}
+
+function render(data) {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+
+  const results = document.getElementById('results');
+  results.innerHTML = '';
+
+  data.forEach(p => {
+    const img = p.images?.[0] ?? '';
+
+    const div = document.createElement('div');
+    div.className = 'place';
+    div.innerHTML = `
+      ${img ? `<img src="${img}" loading="lazy">` : ''}
+      <strong>${p.name}</strong><br>
+      <small>${p.city}, ${p.country}</small>
+    `;
+
+    div.onclick = () => {
+      map.setView([p.lat, p.lng], 14);
+    };
+
+    results.appendChild(div);
+
+    const marker = L.marker([p.lat, p.lng]).addTo(map);
+    marker.bindPopup(`
+      <strong>${p.name}</strong><br>
+      ${p.architect}<br>
+      ${p.year}<br>
+      ${img ? `<img src="${img}" style="width:100%;margin-top:6px">` : ''}
+    `);
+
+    markers.push(marker);
+  });
+}
+</script>
 </body>
 </html>
-
