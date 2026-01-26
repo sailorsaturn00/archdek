@@ -252,7 +252,7 @@
     document.getElementById('stats').textContent = 'Loading brutalist atlas...';
 
     // Carica dati (offline fallback se service worker)
-    fetch('archdek/data/brutalism.json')
+    fetch('/data/brutalism.json')
       .then(r => r.json())
       .then(data => {
         places = data;
