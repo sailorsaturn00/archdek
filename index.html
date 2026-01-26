@@ -1,14 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ArchDek — Architectural Echoes of Brutalism</title>
-
-  <!-- Leaflet -->
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#2E2E2E">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  
+  <!-- Leaflet 1.9.4 -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+  
   <style>
     :root {
       --bg: #0e0e0e;
@@ -16,211 +21,387 @@
       --text: #e6e6e6;
       --muted: #9a9a9a;
       --accent: #cfcfcf;
+      --danger: #ef4444;
     }
+
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: system-ui, sans-serif;
+      font-family: system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
+      overscroll-behavior: none;
     }
 
     #app {
       display: grid;
-      grid-template-columns: 320px 1fr;
+      grid-template-columns: 340px 1fr;
+      grid-template-rows: 60px 1fr;
       height: 100vh;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      background: var(--panel);
+      padding: 12px 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      border-bottom: 1px solid #222;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+
+    #search {
+      flex: 1;
+      padding: 8px 12px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 14px;
     }
 
     aside {
       background: var(--panel);
-      padding: 16px;
+      padding: 20px;
       overflow-y: auto;
       border-right: 1px solid #222;
     }
 
-    h1 {
-      font-size: 1.2rem;
-      margin-bottom: 12px;
+    .filter-group {
+      margin-bottom: 20px;
     }
 
-    .filter {
-      margin-bottom: 12px;
+    .filter-group label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 4px;
     }
 
-    select, input {
+    select {
       width: 100%;
-      padding: 6px;
+      padding: 8px 10px;
       background: #111;
       color: var(--text);
       border: 1px solid #333;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    #stats {
+      text-align: center;
+      padding: 12px;
+      background: #111;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: var(--muted);
     }
 
     #results {
-      margin-top: 16px;
+      margin-top: 8px;
     }
 
     .place {
       cursor: pointer;
-      margin-bottom: 12px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #222;
+      margin-bottom: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      transition: background 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .place:hover, .place:focus {
+      background: #1a1a1a;
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
     }
 
     .place img {
       width: 100%;
-      height: 120px;
+      height: 100px;
       object-fit: cover;
-      margin-bottom: 6px;
-      filter: grayscale(100%);
+      border-radius: 4px;
+      margin-bottom: 8px;
+      filter: grayscale(80%) brightness(1.1);
+    }
+
+    .place h3 {
+      margin: 0 0 4px 0;
+      font-size: 1rem;
+    }
+
+    .place small {
+      color: var(--muted);
+      font-size: 0.8rem;
     }
 
     #map {
       height: 100vh;
+      position: relative;
     }
 
+    .leaflet-popup-content img {
+      max-width: 200px !important;
+      margin-top: 8px;
+    }
+
+    /* Mobile */
     @media (max-width: 900px) {
       #app {
         grid-template-columns: 1fr;
+        grid-template-rows: 60px auto 1fr;
       }
-
+      
       aside {
-        height: 50vh;
+        height: auto;
+        max-height: 40vh;
         border-right: none;
         border-bottom: 1px solid #222;
+        overflow-y: auto;
       }
+      
+      header {
+        padding: 12px;
+      }
+    }
 
-      #map {
-        height: 50vh;
-      }
+    /* Loading */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: var(--muted);
     }
   </style>
 </head>
 <body>
+  <div id="app">
+    <header role="banner">
+      <h1>🏗️ ArchDek</h1>
+      <input id="search" type="search" placeholder="Search buildings..." 
+             aria-label="Search architecture by name">
+    </header>
 
-<div id="app">
-  <aside>
-    <h1>ArchDek</h1>
+    <aside role="complementary" aria-label="Filters and results">
+      <div class="filter-group">
+        <label for="filter-style">Style</label>
+        <select id="filter-style" aria-label="Filter by style">
+          <option value="">All styles</option>
+        </select>
+      </div>
 
-    <input id="search" placeholder="Search by name" />
+      <div class="filter-group">
+        <label for="filter-country">Country</label>
+        <select id="filter-country" aria-label="Filter by country">
+          <option value="">All countries</option>
+        </select>
+      </div>
 
-    <div class="filter">
-      <select id="filter-style"><option value="">All styles</option></select>
-    </div>
+      <div class="filter-group">
+        <label for="filter-tag">Tags</label>
+        <select id="filter-tag" aria-label="Filter by tags">
+          <option value="">All tags</option>
+        </select>
+      </div>
 
-    <div class="filter">
-      <select id="filter-tag"><option value="">All tags</option></select>
-    </div>
+      <div class="filter-group">
+        <label for="filter-status">Status</label>
+        <select id="filter-status" aria-label="Filter by status">
+          <option value="">All status</option>
+        </select>
+      </div>
 
-    <div class="filter">
-      <select id="filter-status"><option value="">All status</option></select>
-    </div>
+      <div class="filter-group">
+        <label for="filter-architect">Architect</label>
+        <select id="filter-architect" aria-label="Filter by architect">
+          <option value="">All status</option>
+        </select>
+      </div>
 
-    <div class="filter">
-      <select id="filter-country"><option value="">All countries</option></select>
-    </div>
+      <div id="stats">Loading...</div>
+      <div id="results" role="list"></div>
+    </aside>
 
-    <div id="results"></div>
-  </aside>
+    <div id="map" role="main" aria-label="Interactive map"></div>
+  </div>
 
-  <div id="map"></div>
-</div>
+  <script>
+    // Inizializzazione mappa centrata globalmente
+    const map = L.map('map', {
+      zoomControl: true,
+      attributionControl: true
+    }).setView([20, 0], 2);
 
-<script>
-let map = L.map('map').setView([20, 0], 2);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap'
-}).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | Brutalism data CC BY 4.0'
+    }).addTo(map);
 
-let markers = [];
-let places = [];
+    let markers = L.layerGroup().addTo(map);
+    let places = [];
+    let allFilters = {};
 
-fetch('data/brutalism.json')
-  .then(r => r.json())
-  .then(data => {
-    places = data;
-    initFilters(data);
-    render(data);
-  });
+    // Loading state
+    document.getElementById('stats').textContent = 'Loading brutalist atlas...';
 
-function initFilters(data) {
-  fillSelect('filter-style', [...new Set(data.flatMap(p => p.styles))]);
-  fillSelect('filter-tag', [...new Set(data.flatMap(p => p.tags))]);
-  fillSelect('filter-status', [...new Set(data.map(p => p.status))]);
-  fillSelect('filter-country', [...new Set(data.map(p => p.country))]);
-}
+    // Carica dati (offline fallback se service worker)
+    fetch('/data/brutalism.json')
+      .then(r => r.json())
+      .then(data => {
+        places = data;
+        initFilters();
+        applyFilters();
+        document.getElementById('stats').textContent = `${data.length} brutalist sites worldwide`;
+      })
+      .catch(err => {
+        document.getElementById('stats').textContent = 'Error loading data';
+        console.error(err);
+      });
 
-function fillSelect(id, values) {
-  const select = document.getElementById(id);
-  values.sort().forEach(v => {
-    const o = document.createElement('option');
-    o.value = v;
-    o.textContent = v;
-    select.appendChild(o);
-  });
-}
+    function initFilters() {
+      const unique = (arr, key) => [...new Set(arr.map(item => item[key]))].sort();
+      
+      allFilters.styles = unique(places, 'styles').flat();
+      allFilters.status = unique(places, 'status');
+      allFilters.tags = unique(places, 'tags').flat();
+      allFilters.countries = unique(places, 'country');
+      allFilters.architect = unique(places, 'architect');
 
-['search','filter-style','filter-tag','filter-status','filter-country']
-  .forEach(id => document.getElementById(id).addEventListener('input', applyFilters));
+      ['filter-style', 'filter-tag', 'filter-status', 'filter-country']
+        .forEach(id => fillSelect(id));
+    }
 
-function applyFilters() {
-  const s = document.getElementById('search').value.toLowerCase();
-  const style = document.getElementById('filter-style').value;
-  const tag = document.getElementById('filter-tag').value;
-  const status = document.getElementById('filter-status').value;
-  const country = document.getElementById('filter-country').value;
+    function fillSelect(id) {
+      const select = document.getElementById(id);
+      const values = allFilters[id.replace('filter-', '')] || [];
+      
+      values.slice(0, 20).forEach(v => {  // Max 20 options
+        const option = document.createElement('option');
+        option.value = v;
+        option.textContent = v.charAt(0).toUpperCase() + v.slice(1);
+        select.appendChild(option);
+      });
+    }
 
-  const filtered = places.filter(p =>
-    (!s || p.name.toLowerCase().includes(s)) &&
-    (!style || p.styles.includes(style)) &&
-    (!tag || p.tags.includes(tag)) &&
-    (!status || p.status === status) &&
-    (!country || p.country === country)
-  );
+    // Event listeners
+    document.querySelectorAll('#search, #filter-style, #filter-tag, #filter-status, #filter-country')
+      .forEach(el => el.addEventListener('input', applyFilters));
 
-  render(filtered);
-}
+    function applyFilters() {
+      const term = document.getElementById('search').value.toLowerCase();
+      
+      const filtered = places.filter(place => 
+        (!term || place.name.toLowerCase().includes(term) || 
+         place.architect.toLowerCase().includes(term) ||
+         place.city.toLowerCase().includes(term)) &&
+        (!document.getElementById('filter-style').value || 
+         place.styles.includes(document.getElementById('filter-style').value)) &&
+        (!document.getElementById('filter-tag').value || 
+         place.tags.includes(document.getElementById('filter-tag').value)) &&
+        (!document.getElementById('filter-status').value || 
+         place.status === document.getElementById('filter-status').value) &&
+        (!document.getElementById('filter-country').value || 
+         place.country === document.getElementById('filter-country').value)
+      );
 
-function render(data) {
-  markers.forEach(m => map.removeLayer(m));
-  markers = [];
+      render(filtered);
+      document.getElementById('stats').textContent = 
+        `${filtered.length} of ${places.length} sites`;
+    }
 
-  const results = document.getElementById('results');
-  results.innerHTML = '';
+    function render(data) {
+      // Clear markers
+      markers.clearLayers();
 
-  data.forEach(p => {
-    const img = Array.isArray(p.images) && p.images.length > 0
-    ? p.images[0]
-    : null;
+      // Clear results
+      const container = document.getElementById('results');
+      container.innerHTML = data.length ? '' : '<div class="loading">No results found</div>';
 
-const div = document.createElement('div');
-div.className = 'place';
-div.innerHTML = `
-  ${img ? `
-    <img src="${img}" loading="lazy" referrerpolicy="no-referrer" 
-         style="width:100%;height:120px;object-fit:cover">
-  ` : ''}
-  <strong>${p.name}</strong><br>
-  <small>${p.city}, ${p.country}</small>
-`;
+      data.slice(0, 50).forEach((place, i) => {  // Max 50 per performance
+        // Sidebar result
+        const result = createPlaceCard(place);
+        result.tabIndex = 0;
+        result.addEventListener('click', () => flyToPlace(place));
+        result.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') flyToPlace(place);
+        });
+        container.appendChild(result);
 
-    div.onclick = () => {
-      map.setView([p.lat, p.lng], 14);
-    };
+        // Map marker
+        const popupContent = createPopup(place);
+        const marker = L.marker([place.lat, place.lng], {
+          icon: L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="background:#cfcfcf;width:12px;height:12px;border-radius:50%;opacity:0.8"></div>`,
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+          })
+        }).bindPopup(popupContent, { maxWidth: 300 });
 
-    results.appendChild(div);
+        marker.on('click', () => flyToPlace(place));
+        markers.addLayer(marker);
+      });
+    }
 
-    const marker = L.marker([p.lat, p.lng]).addTo(map);
-    marker.bindPopup(`
-      <strong>${p.name}</strong><br>
-      ${p.architect} · ${p.year}<br>
-      ${img ? `
-        <img src="${img}" style="width:100%;margin-top:6px" referrerpolicy="no-referrer">
-      ` : ''}
-    `);
+    function createPlaceCard(place) {
+      const div = document.createElement('div');
+      div.className = 'place';
+      div.setAttribute('role', 'button');
+      div.setAttribute('aria-label', `Go to ${place.name} on map`);
+      
+      const img = place.images?.[0] ? 
+        `<img src="${place.images[0]}" alt="${place.name} photo" loading="lazy" onerror="this.style.display='none'">` : 
+        '';
 
-    markers.push(marker);
-  });
-}
-</script>
+      div.innerHTML = `
+        ${img}
+        <h3>${place.name}</h3>
+        <small>${place.city}, ${place.country}</small>
+        <div style="font-size:0.75rem;color:var(--muted);margin-top:4px">
+          ${place.architect} · ${place.year}
+        </div>
+      `;
+      return div;
+    }
+
+    function createPopup(place) {
+      const img = place.images?.[0] ? `<img src="${place.images[0]}" alt="${place.name}">` : '';
+      return `
+        <div style="min-width:250px">
+          <h3 style="margin:0 0 8px 0">${place.name}</h3>
+          <div style="font-size:0.9rem;color:#888;margin-bottom:8px">
+            ${place.architect}<br>
+            ${place.year} · ${place.status}
+          </div>
+          ${img}
+        </div>
+      `;
+    }
+
+    function flyToPlace(place) {
+      map.flyTo([place.lat, place.lng], 16, { duration: 1 });
+    }
+
+    // PWA Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(() => console.log('SW registered'))
+        .catch(err => console.log('SW failed', err));
+    }
+
+    // Keyboard accessibility
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        document.activeElement?.blur();
+      }
+    });
+  </script>
 </body>
 </html>

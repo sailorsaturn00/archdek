@@ -1,12 +1,16 @@
 {
-  "name": "ArchDek",
-  "short_name": "ArchDek",
-  "description": "Architectural Echoes of Brutalism – explore brutalist architecture worldwide.",
+  "name": "ArchDek – Architectural Echoes of Brutalism",
+  "short_name": "ArchDek", 
+  "description": "Explore, map and preserve brutalist architecture worldwide. Global interactive map, wishlist, visited sites and density heatmaps.",
   "start_url": "/index.html",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "background_color": "#121212",
   "theme_color": "#2E2E2E",
-  "orientation": "portrait-primary",
+  "orientation": "any",
+  "lang": "en-US",
+  "dir": "ltr",
+  
   "icons": [
     {
       "src": "icons/icon-192.png",
@@ -19,8 +23,75 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "categories": ["maps", "education", "architecture"],
-  "lang": "en-US"
+  
+  "categories": ["maps", "education", "travel", "architecture", "art"],
+  
+  "screenshots": [
+    {
+      "src": "screenshots/map-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "screenshots/map-mobile.png", 
+      "sizes": "393x844",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  
+  "shortcuts": [
+    {
+      "name": "Explore Map",
+      "short_name": "Map",
+      "description": "Open interactive map",
+      "url": "/index.html#map",
+      "icons": [{"src": "icons/shortcut-map-96.png", "sizes": "96x96"}]
+    },
+    {
+      "name": "My Favorites", 
+      "short_name": "Favorites",
+      "description": "View your favorite buildings",
+      "url": "/favorites.html",
+      "icons": [{"src": "icons/shortcut-favorites-96.png", "sizes": "96x96"}]
+    },
+    {
+      "name": "Nearby Architecture",
+      "short_name": "Nearby",
+      "description": "Discover brutalism near you",
+      "url": "/nearby.html", 
+      "icons": [{"src": "icons/shortcut-nearby-96.png", "sizes": "96x96"}]
+    }
+  ],
+  
+  "share_target": {
+    "action": "/share.html",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text", 
+      "url": "url",
+      "files": [{"name": "file", "accept": ["image/*"]}]
+    }
+  },
+  
+  "protocol_handlers": [{
+    "protocol": "archdek",
+    "title": "Open in ArchDek"
+  }],
+  
+  "prefer_related_applications": false,
+  
+  "generated": "2026-01-26"
 }
+
